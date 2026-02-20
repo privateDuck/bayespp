@@ -3,7 +3,7 @@
 #pragma once
 
 #include <iostream>
-#include <LBFGSpp/LBFGS.h>
+#include <LBFGSpp/LBFGSB.h>
 #include "rbf.hpp"
 
 namespace bayespp {
@@ -60,7 +60,7 @@ namespace bayespp {
             Eigen::MatrixXd W = alpha * alpha.transpose() - K_inv;
 
             // Gradient w.r.t log(sigma)
-            grad[0] = static_cast<double>(n) - y.dot(alpha);
+            grad[0] = static_cast<double>(n) - y.dot(alpha) + jitter * W.trace();
 
             // Gradient w.r.t log(l)
             double grad_l_sum = 0.0;
@@ -81,23 +81,32 @@ namespace bayespp {
     };
 
     [[nodiscard]] inline RBFKernel ComputeOptimalRBFKernel(const Eigen::MatrixXd& X, const Eigen::VectorXd& y, const double jitter = 1e-6) {
-        LBFGSpp::LBFGSParam<double> param_opt;
-        param_opt.epsilon = 1e-6;
+        LBFGSpp::LBFGSBParam<double> param_opt;
+        param_opt.epsilon = 1e-4;
         param_opt.max_iterations = 100;
 
-        LBFGSpp::LBFGSSolver<double> solver(param_opt);
+        LBFGSpp::LBFGSBSolver<double> solver(param_opt);
         GPObjective obj(X, y, jitter);
         Eigen::VectorXd param(2);
-        param << 0.0, 0.0;
+        param << 0.0,-0.693;
+
+        // sigma can be exp(-3), l can be log(0.01) = -4.6
+        Eigen::VectorXd lb(2);
+        lb << -3.0, -4.6;
+
+        // sigma capped at exp(2), l capped at log(10) approx 2.3
+        Eigen::VectorXd ub(2);
+        ub << 2.0, 2.3;
+
         try {
             double nlml;
-            solver.minimize(obj, param, nlml);
+            solver.minimize(obj, param, nlml, lb, ub);
         }
         catch (std::exception& e) {
             std::cerr << e.what() << std::endl;
         }
 
-        return {param[0]*param[0], param[1]*param[1]};
+        return {std::exp(2.0 * param[0]), std::exp(2.0 * param[1])};
     }
 
 };

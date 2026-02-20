@@ -1,8 +1,8 @@
-//
-// Created by Tharuka on 20/02/2026.
-//
+#pragma once
 
-#ifndef TEST_VGRAD_HPP
-#define TEST_VGRAD_HPP
+namespace bayespp {
+struct VGrad {
+    double value;
+};
 
-#endif //TEST_VGRAD_HPP
+};

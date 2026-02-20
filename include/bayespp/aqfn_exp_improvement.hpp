@@ -3,7 +3,7 @@
 #pragma once
 
 #include "rbf.hpp"
-#include <LBFGSpp/LBFGS.h>
+#include <LBFGSpp/LBFGSB.h>
 
 namespace bayespp {
     struct EI_Candidate {
@@ -72,8 +72,8 @@ namespace bayespp {
 
             const double ei_value = (muX - fx_best - exploration) * cdf_Z + sigmaX * pdf_Z;
 
-            const int D = x.size();
-            const int N = X_.cols();
+            const Eigen::Index D = x.size();
+            const Eigen::Index N = X_.cols();
 
             Eigen::MatrixXd grad_k_star(D, N);
 
@@ -81,18 +81,18 @@ namespace bayespp {
 
             for (Eigen::Index i = 0; i < N; ++i) {
                 // Gradient of k(x, x_i) w.r.t x
-                grad_k_star.col(i) = - (x - X_.col(i)) * (k_star(i) / l_sq);
+                grad_k_star.col(i) = -(x - X_.col(i)) * (k_star(i) / l_sq);
             }
 
             Eigen::VectorXd grad_mu(D);
             grad_mu.noalias() = grad_k_star * alpha;
 
             Eigen::VectorXd grad_sigma(D);
-            grad_sigma.noalias() = - (grad_k_star * imm) / sigmaX;
+            grad_sigma.noalias() = -(grad_k_star * imm) / sigmaX;
 
             grad = -(cdf_Z * grad_mu + pdf_Z * grad_sigma);
 
-            return ei_value;
+            return -ei_value;
         }
     private:
 
@@ -116,15 +116,27 @@ namespace bayespp {
     };
 
     [[nodiscard]] inline EI_Candidate OptimizeCandidateEIPoint(const ExpectedImprovement& eif, Eigen::VectorXd& candidateX) {
-        LBFGSpp::LBFGSParam<double> param_opt;
+        LBFGSpp::LBFGSBParam<double> param_opt;
         param_opt.epsilon = 1e-6;
         param_opt.max_iterations = 100;
 
-        LBFGSpp::LBFGSSolver<double> solver(param_opt);
-        double fx_best;
-        solver.minimize(eif, candidateX, fx_best);
+        LBFGSpp::LBFGSBSolver<double> solver(param_opt);
 
-        return {candidateX, fx_best};
+        // Lower and Upper bounds for the normalized space [0, 1]
+        Eigen::VectorXd lower_bounds = Eigen::VectorXd::Zero(candidateX.size());
+        Eigen::VectorXd upper_bounds = Eigen::VectorXd::Ones(candidateX.size());
+
+        double fx_best_negative;
+
+        try {
+            solver.minimize(eif, candidateX, fx_best_negative, lower_bounds, upper_bounds);
+        } catch (const std::exception& e) {
+            fx_best_negative = eif(candidateX);
+            std::cerr << e.what() << std::endl;
+        }
+
+        // Return the positive Expected Improvement
+        return {candidateX, -fx_best_negative};
     }
 
 };

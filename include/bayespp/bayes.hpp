@@ -11,8 +11,8 @@
 namespace bayespp {
 
     struct BayesParameters {
-        int max_iterations = 5;
-        int initial_guesses = 100;
+        int max_iterations = 100;
+        int initial_guesses = 5;
         int max_ei_candidates = 1000;
         int max_ei_opt_candidates = 3;
         double exploration_parameter = 0.01;
@@ -33,23 +33,31 @@ namespace bayespp {
 
         template <typename Foo>
         double Maximize(Foo& func, std::vector<double>& optim_param) {
-            Eigen::MatrixXd Xs(num_normalized_params, opt_params_.max_iterations);
-            Eigen::VectorXd Ys(opt_params_.max_iterations);
-            Eigen::Index eval_points = opt_params_.initial_guesses;
-
-            Eigen::MatrixXd Xsample = Xs.leftCols(eval_points);
-            Eigen::VectorXd Ysample = Ys.head(eval_points);
+            Eigen::MatrixXd Xs(num_normalized_params, opt_params_.max_iterations + opt_params_.initial_guesses);
+            Eigen::VectorXd Ys(opt_params_.max_iterations + opt_params_.initial_guesses);
+            Eigen::Index eval_points = 0;
 
             for (int i = 0; i < opt_params_.initial_guesses; i++) {
-                Xsample.col(i) = get_next_rand();
-                auto inv_tr = param_space_.inverse_transform(Xsample.col(i));
-                Ysample(i) = func(inv_tr);
+                Xs.col(eval_points) = get_next_rand();
+                auto inv_tr = param_space_.inverse_transform(Xs.col(eval_points));
+                Ys(eval_points) = func(inv_tr);
+                eval_points++;
             }
 
+            double initialSignalVar = (Ys.head(eval_points).array() - Ys.head(eval_points).mean()).square().mean();
+            double initialLScale = 2.0;
+            auto defaultKern = RBFKernel(initialSignalVar, initialLScale * initialLScale);
+
             for (int i = 0; i < opt_params_.max_iterations; i++) {
-                RBFKernel optKern = ComputeOptimalRBFKernel(Xsample, Ysample);
-                const double best = Ysample.maxCoeff();
-                ExpectedImprovement ei(optKern, Xsample, Ysample, best, opt_params_.exploration_parameter);
+                auto current_X = Xs.leftCols(eval_points);
+                auto current_Y = Ys.head(eval_points);
+                double meanY = current_Y.mean();
+                double stdY = std::sqrt((current_Y.array() - meanY).square().mean());
+                Eigen::VectorXd Y_std = (current_Y.array() - meanY) / stdY;
+                defaultKern = ComputeOptimalRBFKernel(current_X, Y_std);
+
+                const double best = Y_std.maxCoeff();
+                ExpectedImprovement ei(defaultKern, current_X, Y_std, best, opt_params_.exploration_parameter);
 
                 // Generate candidate points with ei
                 for (int c = 0; c < opt_params_.max_ei_candidates; c++) {
@@ -59,7 +67,7 @@ namespace bayespp {
                 }
 
                 // Optimize ei on the best candidate points
-                Eigen::VectorXd x_best;
+                Eigen::VectorXd x_best = candidate_min_heap_.top().candidate;
                 double y_best = std::numeric_limits<double>::min();
                 while (!candidate_min_heap_.empty()) {
                     auto [candidate, y] = candidate_min_heap_.top();
@@ -76,16 +84,14 @@ namespace bayespp {
                 y_best = func(inv_tr);
 
                 // append new x_best and Foo(x_best) to Xsample and Ysample
+                Xs.col(eval_points) = x_best;
+                Ys(eval_points) = y_best;
                 eval_points++;
-                Xsample = Xs.leftCols(eval_points);
-                Xsample.rightCols<1>() = x_best;
-                Ysample = Ys.head(eval_points);
-                Ysample(eval_points - 1) = y_best;
             }
 
             Eigen::Index optim_index;
-            const double optim_fx = Ysample.maxCoeff(&optim_index);
-            optim_param = param_space_.inverse_transform(Xsample.col(optim_index));
+            const double optim_fx = Ys.maxCoeff(&optim_index);
+            optim_param = param_space_.inverse_transform(Xs.col(optim_index));
             return optim_fx;
         }
 
