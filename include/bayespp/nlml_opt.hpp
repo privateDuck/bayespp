@@ -4,7 +4,7 @@
 
 #include <iostream>
 #include <LBFGSpp/LBFGSB.h>
-#include "rbf.hpp"
+#include "matern52.hpp"
 
 namespace bayespp {
     class GPObjective {
@@ -21,7 +21,7 @@ namespace bayespp {
             const double sigma_sq = sigma * sigma;
             const double l_sq = l * l;
 
-            const RBFKernel kern(sigma_sq, l_sq);
+            const Matern52Kernel kern(sigma_sq, l_sq);
 
             Eigen::MatrixXd SqDist(n, n);
             Eigen::MatrixXd K = kern.Covariance(X, X, SqDist);
@@ -66,10 +66,11 @@ namespace bayespp {
             double grad_l_sum = 0.0;
             for (int i = 0; i < n; ++i) {
                 for (int j = 0; j < n; ++j) {
-                    grad_l_sum += W(i, j) * K(i, j) * SqDist(i, j);
+                    // Multiply by -0.5 because NLML is Negative Log Marginal Likelihood
+                    grad_l_sum += -0.5 * W(i, j) * kern.LGradientWeight(SqDist(i, j));
                 }
             }
-            grad[1] = -0.5 * (1.0 / l_sq) * grad_l_sum;
+            grad[1] = grad_l_sum;
 
             return nlml;
         }
@@ -80,7 +81,7 @@ namespace bayespp {
         double jitter;
     };
 
-    [[nodiscard]] inline RBFKernel ComputeOptimalRBFKernel(const Eigen::MatrixXd& X, const Eigen::VectorXd& y, const double jitter = 1e-6) {
+    [[nodiscard]] inline Matern52Kernel ComputeOptimalKernel(const Eigen::MatrixXd& X, const Eigen::VectorXd& y, const double jitter = 1e-6) {
         LBFGSpp::LBFGSBParam<double> param_opt;
         param_opt.epsilon = 1e-4;
         param_opt.max_iterations = 100;
@@ -103,11 +104,59 @@ namespace bayespp {
             solver.minimize(obj, param, nlml, lb, ub);
         }
         catch (std::exception& e) {
-            std::cerr << e.what() << std::endl;
+            std::cerr << "NLML OPT: " << e.what() << std::endl;
         }
 
         return {std::exp(2.0 * param[0]), std::exp(2.0 * param[1])};
     }
+
+    [[nodiscard]] inline Matern52Kernel ComputeOptimalKernelMultiStart(const Eigen::MatrixXd& X, const Eigen::VectorXd& y, const double jitter = 1e-4) {
+    LBFGSpp::LBFGSBParam<double> param_opt;
+    param_opt.epsilon = 1e-4;
+    param_opt.max_iterations = 100;
+
+    LBFGSpp::LBFGSBSolver<double> solver(param_opt);
+    GPObjective obj(X, y, jitter);
+
+    Eigen::VectorXd lb(2);
+    lb << -3.0, -4.6;
+    Eigen::VectorXd ub(2);
+    ub << 2.0, 2.3;
+
+    // grid of distinct initial guesses: {log_sigma, log_l}
+    std::vector<Eigen::VectorXd> initial_guesses = {
+        (Eigen::VectorXd(2) << 0.0, -0.693).finished(),   // Default (sigma=1, l=0.5)
+        (Eigen::VectorXd(2) << -1.0, 0.0).finished(),     // Low variance, high length scale
+        (Eigen::VectorXd(2) << 1.0, -2.0).finished(),     // High variance, low length scale
+        (Eigen::VectorXd(2) << 0.0, 1.0).finished(),      // Standard variance, very high length scale
+        (Eigen::VectorXd(2) << -2.0, -3.0).finished()     // Very low variance, very low length scale
+    };
+
+    double best_nlml = std::numeric_limits<double>::infinity();
+    Eigen::VectorXd best_param = initial_guesses[0];
+
+    for (const auto& guess : initial_guesses) {
+        Eigen::VectorXd current_param = guess;
+        try {
+            double nlml;
+            solver.minimize(obj, current_param, nlml, lb, ub);
+
+            if (nlml < best_nlml) {
+                best_nlml = nlml;
+                best_param = current_param;
+            }
+        } catch (...) {
+            // Line search failed for this specific start point due to a bad local valley
+        }
+    }
+
+    // Fallback safely to the default guess
+    if (std::isinf(best_nlml)) {
+        best_param = initial_guesses[0];
+    }
+
+    return {std::exp(2.0 * best_param[0]), std::exp(2.0 * best_param[1])};
+}
 
 };
 #endif //ATLAS_NLML_OPT_HPP

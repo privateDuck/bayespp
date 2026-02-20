@@ -46,7 +46,7 @@ namespace bayespp {
 
             double initialSignalVar = (Ys.head(eval_points).array() - Ys.head(eval_points).mean()).square().mean();
             double initialLScale = 2.0;
-            auto defaultKern = RBFKernel(initialSignalVar, initialLScale * initialLScale);
+            auto defaultKern = Matern52Kernel(initialSignalVar, initialLScale * initialLScale);
 
             for (int i = 0; i < opt_params_.max_iterations; i++) {
                 auto current_X = Xs.leftCols(eval_points);
@@ -54,7 +54,7 @@ namespace bayespp {
                 double meanY = current_Y.mean();
                 double stdY = std::sqrt((current_Y.array() - meanY).square().mean());
                 Eigen::VectorXd Y_std = (current_Y.array() - meanY) / stdY;
-                defaultKern = ComputeOptimalRBFKernel(current_X, Y_std);
+                defaultKern = ComputeOptimalKernelMultiStart(current_X, Y_std);
 
                 const double best = Y_std.maxCoeff();
                 ExpectedImprovement ei(defaultKern, current_X, Y_std, best, opt_params_.exploration_parameter);

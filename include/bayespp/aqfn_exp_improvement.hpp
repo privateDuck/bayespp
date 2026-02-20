@@ -5,6 +5,8 @@
 #include "rbf.hpp"
 #include <LBFGSpp/LBFGSB.h>
 
+#include "matern52.hpp"
+
 namespace bayespp {
     struct EI_Candidate {
         Eigen::VectorXd candidate;
@@ -23,7 +25,7 @@ namespace bayespp {
 
     class ExpectedImprovement {
     public:
-        explicit ExpectedImprovement(const RBFKernel& kernel, const Eigen::MatrixXd& X, const Eigen::MatrixXd& Y,  const double fx_best, const double exploration = 0.01)
+        explicit ExpectedImprovement(const Matern52Kernel& kernel, const Eigen::MatrixXd& X, const Eigen::MatrixXd& Y,  const double fx_best, const double exploration = 0.01)
         : kernel(kernel), X_(X), Y_(Y), fx_best(fx_best), exploration(exploration) {
             auto K = kernel.Covariance(X, X);
             K.diagonal().array() += 1e-6;
@@ -77,11 +79,12 @@ namespace bayespp {
 
             Eigen::MatrixXd grad_k_star(D, N);
 
-            const double l_sq = kernel.get_length_scale_squared();
-
             for (Eigen::Index i = 0; i < N; ++i) {
+                const double sq_dist = (x - X_.col(i)).squaredNorm();
+                const double weight = kernel.SpatialGradientWeight(sq_dist);
+
                 // Gradient of k(x, x_i) w.r.t x
-                grad_k_star.col(i) = -(x - X_.col(i)) * (k_star(i) / l_sq);
+                grad_k_star.col(i) = - (x - X_.col(i)) * weight;
             }
 
             Eigen::VectorXd grad_mu(D);
@@ -106,7 +109,7 @@ namespace bayespp {
             return 0.5 * (std::erf(x * oneOvSqrt2) + 1.0);
         }
 
-        RBFKernel kernel;
+        Matern52Kernel kernel;
         Eigen::MatrixXd X_;
         Eigen::VectorXd Y_;
         Eigen::LLT<Eigen::MatrixXd> llt;
@@ -132,7 +135,7 @@ namespace bayespp {
             solver.minimize(eif, candidateX, fx_best_negative, lower_bounds, upper_bounds);
         } catch (const std::exception& e) {
             fx_best_negative = eif(candidateX);
-            std::cerr << e.what() << std::endl;
+            std::cerr << "EI CAND OPT: " << e.what() << std::endl;
         }
 
         // Return the positive Expected Improvement

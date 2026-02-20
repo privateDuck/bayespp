@@ -36,7 +36,7 @@ int main() {
     ps.add_parameter(bayespp::ParameterSpace::Parameter::MakeReal(-2*a, 2*a));
     ps.add_parameter(bayespp::ParameterSpace::Parameter::MakeReal(-2*a*a, 2*a*a));
     bayespp::BayesParameters opt_params; //defaults
-    opt_params.max_iterations = 20;
+    opt_params.max_iterations = 50;
     opt_params.exploration_parameter = 0.01;
     std::cout << "Optimizing..." << std::endl;
     bayespp::BayesOptimizer solver(ps, opt_params);
