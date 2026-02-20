@@ -1,5 +1,5 @@
 
-
+#include <chrono>
 #include <iostream>
 #include "bayespp/BayesPP.hpp"
 
@@ -58,6 +58,7 @@ void test_branin() {
     bayespp::BayesParameters opt_params; //defaults
     opt_params.max_iterations = 50;
     opt_params.exploration_parameter = 0.01;
+    opt_params.use_multistart_kernel_optimizer = true;
 
     std::cout << "Optimizing Branin..." << std::endl;
     bayespp::BayesOptimizer solver(ps, opt_params);
@@ -97,5 +98,10 @@ void test_rosenbrock() {
 }
 
 int main() {
+    std::chrono::high_resolution_clock::time_point t1 = std::chrono::high_resolution_clock::now();
     test_branin();
+    std::chrono::high_resolution_clock::time_point t2 = std::chrono::high_resolution_clock::now();
+
+    const double time = std::chrono::duration_cast<std::chrono::nanoseconds>(t2 - t1).count() * 1e-6;
+    std::cout << "Time took (us): " << time << std::endl;
 }

@@ -50,7 +50,7 @@ namespace bayespp {
                 auto current_Y = Ys.head(eval_points);
                 double meanY = current_Y.mean();
                 double stdY = std::sqrt((current_Y.array() - meanY).square().mean());
-                Eigen::VectorXd Y_std = (current_Y.array() - meanY) / stdY;
+                auto Y_std = (current_Y.array() - meanY) / stdY;
 
                 auto defaultKern =
                     opt_params_.use_multistart_kernel_optimizer ?
@@ -68,24 +68,24 @@ namespace bayespp {
                 }
 
                 // Optimize ei on the best candidate points
-                Eigen::VectorXd x_best = candidate_min_heap_.top().candidate;
+                Xs.col(eval_points) = candidate_min_heap_.top().candidate;
                 double y_best = std::numeric_limits<double>::min();
                 while (!candidate_min_heap_.empty()) {
                     auto [candidate, y] = candidate_min_heap_.top();
                     detail::EI_Candidate optimized_candidate = OptimizeCandidateEIPoint(ei, candidate);
                     if (optimized_candidate.y > y_best) {
                         y_best = optimized_candidate.y;
-                        x_best = candidate;
+                        Xs.col(eval_points) = candidate;
                     }
                     candidate_min_heap_.pop();
                 }
 
                 // Now we actually evaluate function at x_best
-                auto inv_tr = param_space_.inverse_transform(x_best);
+                auto inv_tr = param_space_.inverse_transform(Xs.col(eval_points));
                 y_best = func(inv_tr);
 
                 // append new x_best and Foo(x_best) to Xsample and Ysample
-                Xs.col(eval_points) = x_best;
+                // Xs.col(eval_points) = x_best;
                 Ys(eval_points) = y_best;
                 eval_points++;
             }

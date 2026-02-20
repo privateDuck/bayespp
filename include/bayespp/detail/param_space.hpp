@@ -105,7 +105,10 @@ namespace bayespp {
         }
 
         // The inverse transformation eigen vector
-        [[nodiscard]] std::vector<double> inverse_transform(const Eigen::VectorXd& normalized) const {
+        template<typename Derived>
+        [[nodiscard]] std::vector<double> inverse_transform(const Eigen::MatrixBase<Derived>& normalized) const {
+            EIGEN_STATIC_ASSERT_VECTOR_ONLY(Derived);
+
             std::vector<double> result;
             result.reserve(parameters.size());
 

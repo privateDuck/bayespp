@@ -10,56 +10,55 @@ namespace bayespp::detail {
 
     class GPObjective {
     public:
-        GPObjective(const Eigen::MatrixXd& X_in, const Eigen::VectorXd& y_in, const double jitter_in = 1e-6)
-            : X(X_in), y(y_in), jitter(jitter_in) {}
+        GPObjective(
+            const Eigen::MatrixXd& X_in,
+            const Eigen::VectorXd& y_in,
+            const double jitter_in = 1e-6
+            )
+        : X(X_in), y(y_in), jitter(jitter_in), n(X_in.cols()),
+      SqDist(n, n), K(n, n), K_inv(n, n), W(n, n), alpha(n)
+        {}
 
         double operator()(const Eigen::VectorXd& params, Eigen::VectorXd& grad) const {
-            const Eigen::Index n = X.cols();
-
-            // Exponentiate to enforce strict positivity
-            const double sigma = std::exp(params[0]);
-            const double l = std::exp(params[1]);
-            const double sigma_sq = sigma * sigma;
-            const double l_sq = l * l;
-
+            const double sigma_sq = std::exp(2.0 * params[0]);
+            const double l_sq = std::exp(2.0 * params[1]);
             const Matern52Kernel kern(sigma_sq, l_sq);
 
-            Eigen::MatrixXd SqDist(n, n);
-            Eigen::MatrixXd K = kern.Covariance(X, X, SqDist);
+            for (Eigen::Index i = 0; i < n; i++) {
+                for (Eigen::Index j = 0; j < n; j++) {
+                    K(i, j) = kern.Kernel(X.col(i), X.col(j), SqDist(i, j));
+                }
+            }
 
-            // Add jitter to the diagonal for numerical stability during Cholesky
+            // For numerical stability
             K.diagonal().array() += jitter;
 
             // Cholesky decomp (K = L * L^T)
-            const Eigen::LLT<Eigen::MatrixXd> llt(K);
+            llt.compute(K);
             if (llt.info() == Eigen::NumericalIssue) {
-                // If decomposition fails, return a high penalty to push the optimizer away
                 return std::numeric_limits<double>::infinity();
             }
 
             // Compute alpha = K^{-1} y
-            Eigen::VectorXd alpha = llt.solve(y);
+            alpha = y;
+            llt.solveInPlace(alpha);
 
-            // Compute the Negative Log Marginal Likelihood (NLML)
-            // Log Det 2 * sum(log(diag(L)))
+            // We need K^{-1} to compute W
+            K_inv.setIdentity();
+            llt.solveInPlace(K_inv);
+
+            // W = alpha * alpha^T - K^{-1}
+            W.noalias() = alpha * alpha.transpose() - K_inv;
+
             double log_det = 0.0;
             for (int i = 0; i < n; ++i) {
                 log_det += 2.0 * std::log(llt.matrixL()(i, i));
             }
 
-            const double data_fit = 0.5 * y.dot(alpha);
-            const double complexity_penalty = 0.5 * log_det;
-            const double constant = 0.5 * static_cast<double>(n) * std::log(6.283185307179586476925286766559); // 0.5*n*log(2*pi)
-
-            const double nlml = data_fit + complexity_penalty + constant;
+            // Compute the Negative Log Marginal Likelihood (NLML)
+            const double nlml = 0.5 * y.dot(alpha) + 0.5 * log_det + 0.5 * static_cast<double>(n) * 1.8378770664093453;
 
             // Compute Gradients
-            // We need K^{-1} to compute W
-            const Eigen::MatrixXd K_inv = llt.solve(Eigen::MatrixXd::Identity(n, n));
-
-            // W = alpha * alpha^T - K^{-1}
-            Eigen::MatrixXd W = alpha * alpha.transpose() - K_inv;
-
             // Gradient w.r.t log(sigma)
             grad[0] = static_cast<double>(n) - y.dot(alpha) + jitter * W.trace();
 
@@ -67,7 +66,6 @@ namespace bayespp::detail {
             double grad_l_sum = 0.0;
             for (int i = 0; i < n; ++i) {
                 for (int j = 0; j < n; ++j) {
-                    // Multiply by -0.5 because NLML is Negative Log Marginal Likelihood
                     grad_l_sum += -0.5 * W(i, j) * kern.LGradientWeight(SqDist(i, j));
                 }
             }
@@ -80,6 +78,14 @@ namespace bayespp::detail {
         Eigen::MatrixXd X;
         Eigen::VectorXd y;
         double jitter;
+        Eigen::Index n;
+
+        mutable Eigen::MatrixXd SqDist;
+        mutable Eigen::MatrixXd K;
+        mutable Eigen::MatrixXd K_inv;
+        mutable Eigen::MatrixXd W;
+        mutable Eigen::VectorXd alpha;
+        mutable Eigen::LLT<Eigen::MatrixXd> llt;
     };
 
     [[nodiscard]] inline Matern52Kernel ComputeOptimalKernel(const Eigen::MatrixXd& X, const Eigen::VectorXd& y, const double jitter = 1e-6) {
@@ -136,7 +142,7 @@ namespace bayespp::detail {
     double best_nlml = std::numeric_limits<double>::infinity();
     Eigen::VectorXd best_param = initial_guesses[0];
 
-    for (const auto& guess : initial_guesses) {
+    for (auto& guess : initial_guesses) {
         Eigen::VectorXd current_param = guess;
         try {
             double nlml;

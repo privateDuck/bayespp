@@ -24,9 +24,24 @@ namespace bayespp::detail {
 
     class ExpectedImprovement {
     public:
-        explicit ExpectedImprovement(const Matern52Kernel& kernel, const Eigen::MatrixXd& X, const Eigen::MatrixXd& Y,  const double fx_best, const double exploration = 0.01)
-        : kernel(kernel), X_(X), Y_(Y), fx_best(fx_best), exploration(exploration) {
-            auto K = kernel.Covariance(X, X);
+        explicit ExpectedImprovement(
+            const Matern52Kernel& kernel,
+            const Eigen::MatrixXd& X,
+            const Eigen::MatrixXd& Y,
+            const double fx_best,
+            const double exploration = 0.01
+            )
+        : kernel(kernel), X_(X), Y_(Y), fx_best(fx_best), exploration(exploration),
+        k_star(X.cols()), imm(X.cols()), grad_k_star(X.rows(), X.cols()),
+        grad_mu(X.rows()), grad_sigma(X.rows())
+        {
+            // auto K = kernel.Covariance(X_, X_);
+            Eigen::MatrixXd K(X.cols(), X.cols());
+            for (Eigen::Index i = 0; i < X_.cols(); i++) {
+                for (Eigen::Index j = 0; j < X_.cols(); j++) {
+                    K(i, j) = kernel.Kernel(X_.col(i), X_.col(j));
+                }
+            }
             K.diagonal().array() += 1e-6;
             llt.compute(K);
             alpha = llt.solve(Y_);
@@ -34,11 +49,15 @@ namespace bayespp::detail {
 
         // EI(X)
         double operator()(const Eigen::VectorXd& x) const {
-            const Eigen::VectorXd k_star = kernel.Covariance(X_, x);
+            for (Eigen::Index i = 0; i < X_.cols(); i++) {
+                k_star(i) = kernel.Kernel(X_.col(i), x);
+            }
             const double kb = kernel.Kernel(x, x);
-
             const double muX = k_star.dot(alpha);
-            const Eigen::VectorXd imm = llt.solve(k_star);
+
+            imm = k_star;
+            llt.solveInPlace(imm);
+
             const double variance = std::max(0.0, kb - k_star.dot(imm));
             const double sigmaX = std::sqrt(variance);
 
@@ -46,17 +65,22 @@ namespace bayespp::detail {
                 return 0.0;
             }
 
-            const double Z = (muX - fx_best - exploration)/sigmaX;
-            return (muX - fx_best - exploration) * norm_cdf(Z) + sigmaX * norm_pdf(Z);
+            const double Z = (muX - fx_best - exploration) / sigmaX;
+            const double cdf_Z = norm_cdf(Z);
+            const double pdf_Z = norm_pdf(Z);
+            return (muX - fx_best - exploration) * cdf_Z + sigmaX * pdf_Z;
         }
 
         // Gradient of EI(X) w.r.t X for LBFGS
         double operator()(const Eigen::VectorXd& x, Eigen::VectorXd& grad) const {
-            const Eigen::VectorXd k_star = kernel.Covariance(X_, x);
+            for (Eigen::Index i = 0; i < X_.cols(); i++) {
+                k_star(i) = kernel.Kernel(X_.col(i), x);
+            }
             const double kb = kernel.Kernel(x, x);
-
             const double muX = k_star.dot(alpha);
-            const Eigen::VectorXd imm = llt.solve(k_star);
+
+            imm = k_star;
+            llt.solveInPlace(imm);
 
             const double variance = std::max(0.0, kb - k_star.dot(imm));
             const double sigmaX = std::sqrt(variance);
@@ -70,29 +94,18 @@ namespace bayespp::detail {
             const double Z = (muX - fx_best - exploration) / sigmaX;
             const double cdf_Z = norm_cdf(Z);
             const double pdf_Z = norm_pdf(Z);
-
             const double ei_value = (muX - fx_best - exploration) * cdf_Z + sigmaX * pdf_Z;
 
-            const Eigen::Index D = x.size();
-            const Eigen::Index N = X_.cols();
-
-            Eigen::MatrixXd grad_k_star(D, N);
-
-            for (Eigen::Index i = 0; i < N; ++i) {
+            for (Eigen::Index i = 0; i < X_.cols(); ++i) {
                 const double sq_dist = (x - X_.col(i)).squaredNorm();
                 const double weight = kernel.SpatialGradientWeight(sq_dist);
-
-                // Gradient of k(x, x_i) w.r.t x
-                grad_k_star.col(i) = - (x - X_.col(i)) * weight;
+                grad_k_star.col(i) = -(x - X_.col(i)) * weight;
             }
 
-            Eigen::VectorXd grad_mu(D);
             grad_mu.noalias() = grad_k_star * alpha;
-
-            Eigen::VectorXd grad_sigma(D);
             grad_sigma.noalias() = -(grad_k_star * imm) / sigmaX;
 
-            grad = -(cdf_Z * grad_mu + pdf_Z * grad_sigma);
+            grad.noalias() = -(cdf_Z * grad_mu + pdf_Z * grad_sigma);
 
             return -ei_value;
         }
@@ -115,6 +128,12 @@ namespace bayespp::detail {
         Eigen::VectorXd alpha;
         double fx_best;
         double exploration;
+
+        mutable Eigen::VectorXd k_star;
+        mutable Eigen::VectorXd imm;
+        mutable Eigen::MatrixXd grad_k_star;
+        mutable Eigen::VectorXd grad_mu;
+        mutable Eigen::VectorXd grad_sigma;
     };
 
     [[nodiscard]] inline EI_Candidate OptimizeCandidateEIPoint(const ExpectedImprovement& eif, Eigen::VectorXd& candidateX) {
