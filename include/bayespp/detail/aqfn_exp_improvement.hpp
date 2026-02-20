@@ -1,13 +1,12 @@
-#ifndef ATLAS_AQFN_EXP_IMPROV_HPP
-#define ATLAS_AQFN_EXP_IMPROV_HPP
+#ifndef AQFN_EXP_IMPROV_HPP
+#define AQFN_EXP_IMPROV_HPP
 #pragma once
 
-#include "rbf.hpp"
 #include <LBFGSpp/LBFGSB.h>
-
 #include "matern52.hpp"
 
-namespace bayespp {
+namespace bayespp::detail {
+
     struct EI_Candidate {
         Eigen::VectorXd candidate;
         double y;
@@ -144,4 +143,4 @@ namespace bayespp {
 
 };
 
-#endif //ATLAS_AQFN_EXP_IMPROV_HPP
+#endif // AQFN_EXP_IMPROV_HPP

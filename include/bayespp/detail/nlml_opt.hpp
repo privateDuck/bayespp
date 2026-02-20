@@ -1,12 +1,13 @@
-#ifndef ATLAS_NLML_OPT_HPP
-#define ATLAS_NLML_OPT_HPP
+#ifndef NLML_OPT_HPP
+#define NLML_OPT_HPP
 #pragma once
 
 #include <iostream>
 #include <LBFGSpp/LBFGSB.h>
 #include "matern52.hpp"
 
-namespace bayespp {
+namespace bayespp::detail {
+
     class GPObjective {
     public:
         GPObjective(const Eigen::MatrixXd& X_in, const Eigen::VectorXd& y_in, const double jitter_in = 1e-6)
@@ -159,4 +160,4 @@ namespace bayespp {
 }
 
 };
-#endif //ATLAS_NLML_OPT_HPP
+#endif // NLML_OPT_HPP

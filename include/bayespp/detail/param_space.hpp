@@ -1,5 +1,5 @@
-#ifndef ATLAS_PARAM_SPACE_HPP
-#define ATLAS_PARAM_SPACE_HPP
+#ifndef PARAM_SPACE_HPP
+#define PARAM_SPACE_HPP
 #pragma once
 
 #include <cmath>
@@ -23,7 +23,6 @@ namespace bayespp {
             OptionFixed
         };
 
-        // Flat struct ensures contiguous memory layout
         struct Parameter {
             Type type;
             double min;
@@ -31,30 +30,28 @@ namespace bayespp {
             double fixed_val;
             int num_options;
 
-            static Parameter MakeReal(double min, double max) { return {Type::Real, min, max, 0.0, 0}; }
-            static Parameter MakeRealLog(double min, double max) { return {Type::RealLog, std::max(min, 0.0), max, 0.0, 0}; }
-            static Parameter MakeRealFixed(double val) { return {Type::RealFixed, 0.0, 0.0, val, 0}; }
-            static Parameter MakeInt(double min, double max) { return {Type::Integer, min, max, 0.0, 0}; }
-            static Parameter MakeIntFixed(double val) { return {Type::IntegerFixed, 0.0, 0.0, val, 0}; }
-            static Parameter MakeOption(int num_options) { return {Type::Option, 0.0, 0.0, 0.0, num_options}; }
-            static Parameter MakeOptionFixed(double val) { return {Type::OptionFixed, 0.0, 0.0, val, 0}; }
+            static Parameter MakeReal(const double min, const double max) { return {Type::Real, min, max, 0.0, 0}; }
+            static Parameter MakeRealLog(const double min, const double max) { return {Type::RealLog, std::max(min, 0.0), max, 0.0, 0}; }
+            static Parameter MakeRealFixed(const double val) { return {Type::RealFixed, 0.0, 0.0, val, 0}; }
+            static Parameter MakeInt(const double min, const double max) { return {Type::Integer, min, max, 0.0, 0}; }
+            static Parameter MakeIntFixed(const double val) { return {Type::IntegerFixed, 0.0, 0.0, val, 0}; }
+            static Parameter MakeOption(const int num_options) { return {Type::Option, 0.0, 0.0, 0.0, num_options}; }
+            static Parameter MakeOptionFixed(const double val) { return {Type::OptionFixed, 0.0, 0.0, val, 0}; }
         };
 
-        void add_parameter(const Parameter& p) {
-            if (p.type == Type::Real || p.type == Type::RealLog || p.type == Type::Integer) {
-                norm_params++;
-            }
-            else if (p.type == Type::Option) {
-                norm_params += p.num_options;
-            }
-            parameters.push_back(p);
-        }
+        void AddRealParameter(const double min, const double max) { add_parameter(Parameter::MakeReal(min, max)); }
+        void AddLogRealParameter(const double min, const double max) { add_parameter(Parameter::MakeRealLog(min, max)); }
+        void AddFixedRealParameter(const double value) { add_parameter(Parameter::MakeRealFixed(value)); }
+        void AddIntegerParameter(const double min, const double max) { add_parameter(Parameter::MakeInt(min, max)); }
+        void AddFixedIntegerParameter(const double value) { add_parameter(Parameter::MakeIntFixed(value)); }
+        void AddOptionParameter(const int num_options) { add_parameter(Parameter::MakeOption(num_options)); }
+        void AddFixedOptionParameter(const double value) { add_parameter(Parameter::MakeOptionFixed(value)); }
 
         [[nodiscard]] size_t num_parameters() const { return parameters.size(); }
 
         [[nodiscard]] size_t num_normalized_params() const { return norm_params; }
 
-        // The inverse transformation logic
+        // The inverse transformation of vector
         [[nodiscard]] std::vector<double> inverse_transform(const std::vector<double>& normalized) const {
             std::vector<double> result;
             result.reserve(parameters.size());
@@ -157,9 +154,19 @@ namespace bayespp {
         }
 
     private:
+        void add_parameter(const Parameter& p) {
+            if (p.type == Type::Real || p.type == Type::RealLog || p.type == Type::Integer) {
+                norm_params++;
+            }
+            else if (p.type == Type::Option) {
+                norm_params += p.num_options;
+            }
+            parameters.push_back(p);
+        }
+
         std::vector<Parameter> parameters;
         size_t norm_params = 0;
     };
 
 };
-#endif //ATLAS_PARAM_SPACE_HPP
+#endif // PARAM_SPACE_HPP

@@ -7,7 +7,8 @@
 #include <Eigen/Dense>
 #include <cmath>
 
-namespace bayespp {
+namespace bayespp::detail {
+
     class Matern52Kernel {
     public:
         Matern52Kernel(const double sigma_sq, const double l_sq)

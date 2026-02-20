@@ -1,10 +1,11 @@
-#ifndef ATLAS_RBF_HPP
-#define ATLAS_RBF_HPP
+#ifndef RBF_HPP
+#define RBF_HPP
 #pragma once
 
 #include <Eigen/Dense>
 
-namespace bayespp {
+namespace bayespp::detail {
+
     class RBFKernel {
     public:
         RBFKernel(const double sigma_sq, const double l_sq) : sigma_sq(sigma_sq), l_sq(l_sq) {}
@@ -49,4 +50,4 @@ namespace bayespp {
     };
 
 };
-#endif //ATLAS_RBF_HPP
+#endif // RBF_HPP

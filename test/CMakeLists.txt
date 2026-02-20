@@ -7,7 +7,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # 3. Define the Executable
 add_executable(test_bench main.cpp
-        ../include/bayespp/vgrad.hpp)
+        ../include/bayespp/vgrad.hpp
+        ../include/bayespp/BayesPP.hpp)
 
 # 4. Include your local library headers (root/include)
 target_include_directories(test_bench PRIVATE "../include")

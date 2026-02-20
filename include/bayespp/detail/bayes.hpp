@@ -1,5 +1,5 @@
-#ifndef ATLAS_BAYES_HPP
-#define ATLAS_BAYES_HPP
+#ifndef BAYES_HPP
+#define BAYES_HPP
 #pragma once
 
 #include <random>
@@ -11,11 +11,12 @@
 namespace bayespp {
 
     struct BayesParameters {
+        double exploration_parameter = 0.01;
         int max_iterations = 100;
         int initial_guesses = 5;
         int max_ei_candidates = 1000;
         int max_ei_opt_candidates = 3;
-        double exploration_parameter = 0.01;
+        bool use_multistart_kernel_optimizer = false;
     };
 
     class BayesOptimizer {
@@ -44,20 +45,20 @@ namespace bayespp {
                 eval_points++;
             }
 
-            double initialSignalVar = (Ys.head(eval_points).array() - Ys.head(eval_points).mean()).square().mean();
-            double initialLScale = 2.0;
-            auto defaultKern = Matern52Kernel(initialSignalVar, initialLScale * initialLScale);
-
             for (int i = 0; i < opt_params_.max_iterations; i++) {
                 auto current_X = Xs.leftCols(eval_points);
                 auto current_Y = Ys.head(eval_points);
                 double meanY = current_Y.mean();
                 double stdY = std::sqrt((current_Y.array() - meanY).square().mean());
                 Eigen::VectorXd Y_std = (current_Y.array() - meanY) / stdY;
-                defaultKern = ComputeOptimalKernelMultiStart(current_X, Y_std);
+
+                auto defaultKern =
+                    opt_params_.use_multistart_kernel_optimizer ?
+                detail::ComputeOptimalKernelMultiStart(current_X, Y_std)
+                : detail::ComputeOptimalKernel(current_X, Y_std);
 
                 const double best = Y_std.maxCoeff();
-                ExpectedImprovement ei(defaultKern, current_X, Y_std, best, opt_params_.exploration_parameter);
+                detail::ExpectedImprovement ei(defaultKern, current_X, Y_std, best, opt_params_.exploration_parameter);
 
                 // Generate candidate points with ei
                 for (int c = 0; c < opt_params_.max_ei_candidates; c++) {
@@ -71,7 +72,7 @@ namespace bayespp {
                 double y_best = std::numeric_limits<double>::min();
                 while (!candidate_min_heap_.empty()) {
                     auto [candidate, y] = candidate_min_heap_.top();
-                    EI_Candidate optimized_candidate = OptimizeCandidateEIPoint(ei, candidate);
+                    detail::EI_Candidate optimized_candidate = OptimizeCandidateEIPoint(ei, candidate);
                     if (optimized_candidate.y > y_best) {
                         y_best = optimized_candidate.y;
                         x_best = candidate;
@@ -119,9 +120,9 @@ namespace bayespp {
         std::uniform_real_distribution<double> distribution_;
         Eigen::VectorXd uniform_buf_;
         BayesParameters opt_params_;
-        std::priority_queue<EI_Candidate, std::vector<EI_Candidate>, std::greater<EI_Candidate>> candidate_min_heap_;
-        int num_normalized_params;
+        std::priority_queue<detail::EI_Candidate, std::vector<detail::EI_Candidate>, std::greater<>> candidate_min_heap_;
+        size_t num_normalized_params;
     };
 
 };
-#endif //ATLAS_BAYES_HPP
+#endif // BAYES_HPP
