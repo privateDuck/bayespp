@@ -18,7 +18,7 @@ namespace bayespp {
 
     struct BayesParameters {
         double exploration_parameter = 0.01;
-        int max_evaluations = 100;
+        int n_evaluations = 100;
         int n_initial_points = 5;
         int n_acq_samples = 1000;
         int n_acq_restarts = 3;
@@ -40,8 +40,8 @@ namespace bayespp {
 
         template <typename Foo>
         double Maximize(Foo& func, std::vector<double>& optim_param) {
-            Eigen::MatrixXd Xs(num_normalized_params, opt_params_.max_evaluations + opt_params_.n_initial_points);
-            Eigen::VectorXd Ys(opt_params_.max_evaluations + opt_params_.n_initial_points);
+            Eigen::MatrixXd Xs(num_normalized_params, opt_params_.n_evaluations + opt_params_.n_initial_points);
+            Eigen::VectorXd Ys(opt_params_.n_evaluations + opt_params_.n_initial_points);
             Eigen::Index eval_points = 0;
 
             for (int i = 0; i < opt_params_.n_initial_points; i++) {
@@ -51,7 +51,7 @@ namespace bayespp {
                 eval_points++;
             }
 
-            for (int i = 0; i < opt_params_.max_evaluations; i++) {
+            for (int i = 0; i < opt_params_.n_evaluations; i++) {
                 auto current_X = Xs.leftCols(eval_points);
                 auto current_Y = Ys.head(eval_points);
                 double meanY = current_Y.mean();

@@ -54,7 +54,7 @@ void test_branin() {
     ps.AddRealParameter(0, 15);
 
     bayespp::BayesParameters opt_params; //defaults
-    opt_params.max_evaluations = 50;
+    opt_params.n_evaluations = 50;
     opt_params.exploration_parameter = 0.01;
     opt_params.enable_kernel_multistart = true;
 
@@ -81,7 +81,7 @@ void test_rosenbrock() {
     ps.AddRealParameter(-2*a, 2*a);
     ps.AddRealParameter(-2*a*a, 2*a*a);
     bayespp::BayesParameters opt_params; //defaults
-    opt_params.max_evaluations = 50;
+    opt_params.n_evaluations = 50;
     opt_params.exploration_parameter = 0.01;
     std::cout << "Optimizing Rosenbrock..." << std::endl;
     bayespp::BayesOptimizer solver(ps, opt_params);

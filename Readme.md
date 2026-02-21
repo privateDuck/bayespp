@@ -68,9 +68,9 @@ int main() {
     ps.AddRealParameter(-5, 10); // x1 bounds
     ps.AddRealParameter(0, 15);  // x2 bounds
 
-    // 3. Configure the Optimizer (Using default parameters)
+    // 3. Configure the Optimizer
     bayespp::BayesParameters opt_params;
-    opt_params.max_iterations = 100;
+    opt_params.n_evaluations = 50;
 
     // 4. Initialize and Run
     bayespp::BayesOptimizer solver(ps, opt_params);
@@ -120,17 +120,16 @@ bayespp::ParameterSpace ps;
 // Real numbers in a linear space
 ps.AddRealParameter(-5.0, 10.0);
 
-// Real numbers in a log space (great for large ranges like learning rates)
+// Real numbers in a log space
 ps.AddLogRealParameter(1e-5, 1e-1);
 
 // Integer values
 ps.AddIntegerParameter(2, 5);
 
-// Categorical Options (e.g., 3 means indices 0, 1, 2)
-// Your objective function should cast this double back to an int to handle logic.
+// Categorical parameters
 ps.AddOptionParameter(3);
 
-// Fixed parameters (useful for ablation studies without changing indices)
+// Fixed parameters
 ps.AddFixedRealParameter(2.4);
 ps.AddFixedIntegerParameter(4);
 ps.AddFixedOptionParameter(1);
@@ -143,7 +142,7 @@ The bayespp::BayesParameters struct allows you to fine-tune the behavior of the 
 * `exploration_parameter` (Default: 0.01): Controls the exploration-exploitation trade-off in the Expected Improvement acquisition function.
 Value can be interpreted as a probability.
 
-* `max_evaluations` (Default: 100): The number of times the objective function will be evaluated.
+* `n_evaluations` (Default: 100): The number of times the objective function will be evaluated.
 
 * `n_initial_points` (Default: 5): The number of random initial points evaluated to bootstrap the Gaussian Process. Must be strictly greater than 2.
 
@@ -153,30 +152,4 @@ Value can be interpreted as a probability.
 
 * `enable_kernel_multistart` (Default: true): If true, the library uses a multi-start optimizer to fit the GP kernel hyperparameters. This is computationally more expensive but yields a much more accurate surrogate model.
 
-⚠️ Total number of function evaluations = `max_evaluations + n_initial_points`
-
-
-```cpp
-bayespp::BayesParameters opt_params;
-
-// Trade-off: Higher means more exploration (searching new areas),
-// Lower means more exploitation (refining known good areas). Default: 0.01
-opt_params.exploration_parameter = 0.01;
-
-// Total number of times your objective function will be called.
-opt_params.max_evaluations = 100;
-
-// Number of initial random evaluations to bootstrap the GP. Must be > 2.
-opt_params.n_initial_points = 5;
-
-// Number of random samples taken across the surrogate model to find the best Expected Improvement (EI).
-opt_params.n_acq_samples = 1000;
-
-// Number of the top EI candidates that will be optimized.
-// Represents the number of potential peaks explored internally per iteration.
-opt_params.n_acq_restarts = 3;
-
-// True: Optimizes the kernel hyperparameters using multiple starts (expensive but more accurate).
-// False: Uses a single start optimization.
-opt_params.enable_kernel_multistart = true;
-```
+`⚠️ Total number of function evaluations = n_evaluations + n_initial_points`
