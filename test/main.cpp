@@ -22,9 +22,6 @@ private:
 class BraninFunction {
 public:
     double operator()(const std::vector<double>& x) const {
-        // Map normalized space to Branin's true domain:
-        // x1 is in [-5, 10]
-        // x2 is in [0, 15]
         const double x1 = x[0];
         const double x2 = x[1];
 
@@ -55,10 +52,11 @@ void test_branin() {
     // x2 is in [0, 15]
     ps.AddRealParameter(-5, 10);
     ps.AddRealParameter(0, 15);
+
     bayespp::BayesParameters opt_params; //defaults
-    opt_params.max_iterations = 50;
+    opt_params.max_evaluations = 50;
     opt_params.exploration_parameter = 0.01;
-    opt_params.use_multistart_kernel_optimizer = true;
+    opt_params.enable_kernel_multistart = true;
 
     std::cout << "Optimizing Branin..." << std::endl;
     bayespp::BayesOptimizer solver(ps, opt_params);
@@ -83,7 +81,7 @@ void test_rosenbrock() {
     ps.AddRealParameter(-2*a, 2*a);
     ps.AddRealParameter(-2*a*a, 2*a*a);
     bayespp::BayesParameters opt_params; //defaults
-    opt_params.max_iterations = 50;
+    opt_params.max_evaluations = 50;
     opt_params.exploration_parameter = 0.01;
     std::cout << "Optimizing Rosenbrock..." << std::endl;
     bayespp::BayesOptimizer solver(ps, opt_params);

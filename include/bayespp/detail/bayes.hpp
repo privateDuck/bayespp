@@ -1,5 +1,11 @@
-#ifndef BAYES_HPP
-#define BAYES_HPP
+// Copyright (c) 2026 Jayawardane
+// SPDX-License-Identifier: MIT
+//
+// This file is part of bayespp.
+// See the LICENSE file in the project root for full license information.
+
+#ifndef BAYESPP_BAYES_HPP
+#define BAYESPP_BAYES_HPP
 #pragma once
 
 #include <random>
@@ -12,11 +18,11 @@ namespace bayespp {
 
     struct BayesParameters {
         double exploration_parameter = 0.01;
-        int max_iterations = 100;
-        int initial_guesses = 5;
-        int max_ei_candidates = 1000;
-        int max_ei_opt_candidates = 3;
-        bool use_multistart_kernel_optimizer = false;
+        int max_evaluations = 100;
+        int n_initial_points = 5;
+        int n_acq_samples = 1000;
+        int n_acq_restarts = 3;
+        bool enable_kernel_multistart = false;
     };
 
     class BayesOptimizer {
@@ -34,18 +40,18 @@ namespace bayespp {
 
         template <typename Foo>
         double Maximize(Foo& func, std::vector<double>& optim_param) {
-            Eigen::MatrixXd Xs(num_normalized_params, opt_params_.max_iterations + opt_params_.initial_guesses);
-            Eigen::VectorXd Ys(opt_params_.max_iterations + opt_params_.initial_guesses);
+            Eigen::MatrixXd Xs(num_normalized_params, opt_params_.max_evaluations + opt_params_.n_initial_points);
+            Eigen::VectorXd Ys(opt_params_.max_evaluations + opt_params_.n_initial_points);
             Eigen::Index eval_points = 0;
 
-            for (int i = 0; i < opt_params_.initial_guesses; i++) {
+            for (int i = 0; i < opt_params_.n_initial_points; i++) {
                 Xs.col(eval_points) = get_next_rand();
                 auto inv_tr = param_space_.inverse_transform(Xs.col(eval_points));
                 Ys(eval_points) = func(inv_tr);
                 eval_points++;
             }
 
-            for (int i = 0; i < opt_params_.max_iterations; i++) {
+            for (int i = 0; i < opt_params_.max_evaluations; i++) {
                 auto current_X = Xs.leftCols(eval_points);
                 auto current_Y = Ys.head(eval_points);
                 double meanY = current_Y.mean();
@@ -53,7 +59,7 @@ namespace bayespp {
                 auto Y_std = (current_Y.array() - meanY) / stdY;
 
                 auto defaultKern =
-                    opt_params_.use_multistart_kernel_optimizer ?
+                    opt_params_.enable_kernel_multistart ?
                 detail::ComputeOptimalKernelMultiStart(current_X, Y_std)
                 : detail::ComputeOptimalKernel(current_X, Y_std);
 
@@ -61,7 +67,7 @@ namespace bayespp {
                 detail::ExpectedImprovement ei(defaultKern, current_X, Y_std, best, opt_params_.exploration_parameter);
 
                 // Generate candidate points with ei
-                for (int c = 0; c < opt_params_.max_ei_candidates; c++) {
+                for (int c = 0; c < opt_params_.n_acq_samples; c++) {
                     get_next_rand();
                     const double ei_x = ei(uniform_buf_);
                     add_ei_opt_point(uniform_buf_, ei_x);
@@ -84,7 +90,6 @@ namespace bayespp {
                 auto inv_tr = param_space_.inverse_transform(Xs.col(eval_points));
                 y_best = func(inv_tr);
 
-                // append new x_best and Foo(x_best) to Xsample and Ysample
                 // Xs.col(eval_points) = x_best;
                 Ys(eval_points) = y_best;
                 eval_points++;
@@ -107,7 +112,7 @@ namespace bayespp {
         }
 
         void add_ei_opt_point(const Eigen::VectorXd& candidate, const double y) {
-            if (candidate_min_heap_.size() < opt_params_.max_ei_opt_candidates) {
+            if (candidate_min_heap_.size() < opt_params_.n_acq_restarts) {
                 candidate_min_heap_.push({candidate, y});
             } else if (y > candidate_min_heap_.top().y) {
                 candidate_min_heap_.pop();

@@ -1,11 +1,14 @@
-#ifndef MATERN_HPP
-#define MATERN_HPP
+// Copyright (c) 2026 Jayawardane
+// SPDX-License-Identifier: MIT
+//
+// This file is part of bayespp.
+// See the LICENSE file in the project root for full license information.
+
+#ifndef BAYESPP_MATERN_HPP
+#define BAYESPP_MATERN_HPP
 #pragma once
 
 #include <Eigen/Dense>
-
-#include <Eigen/Dense>
-#include <cmath>
 
 namespace bayespp::detail {
 

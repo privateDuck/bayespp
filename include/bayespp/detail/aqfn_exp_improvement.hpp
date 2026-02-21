@@ -1,5 +1,11 @@
-#ifndef AQFN_EXP_IMPROV_HPP
-#define AQFN_EXP_IMPROV_HPP
+// Copyright (c) 2026 Jayawardane
+// SPDX-License-Identifier: MIT
+//
+// This file is part of bayespp.
+// See the LICENSE file in the project root for full license information.
+
+#ifndef BAYESPP_AQFN_EXP_IMPROV_HPP
+#define BAYESPP_AQFN_EXP_IMPROV_HPP
 #pragma once
 
 #include <LBFGSpp/LBFGSB.h>
@@ -35,7 +41,6 @@ namespace bayespp::detail {
         k_star(X.cols()), imm(X.cols()), grad_k_star(X.rows(), X.cols()),
         grad_mu(X.rows()), grad_sigma(X.rows())
         {
-            // auto K = kernel.Covariance(X_, X_);
             Eigen::MatrixXd K(X.cols(), X.cols());
             for (Eigen::Index i = 0; i < X_.cols(); i++) {
                 for (Eigen::Index j = 0; j < X_.cols(); j++) {
@@ -144,8 +149,8 @@ namespace bayespp::detail {
         LBFGSpp::LBFGSBSolver<double> solver(param_opt);
 
         // Lower and Upper bounds for the normalized space [0, 1]
-        Eigen::VectorXd lower_bounds = Eigen::VectorXd::Zero(candidateX.size());
-        Eigen::VectorXd upper_bounds = Eigen::VectorXd::Ones(candidateX.size());
+        const Eigen::VectorXd lower_bounds = Eigen::VectorXd::Zero(candidateX.size());
+        const Eigen::VectorXd upper_bounds = Eigen::VectorXd::Ones(candidateX.size());
 
         double fx_best_negative;
 

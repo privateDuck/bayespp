@@ -1,5 +1,11 @@
-#ifndef NLML_OPT_HPP
-#define NLML_OPT_HPP
+// Copyright (c) 2026 Jayawardane
+// SPDX-License-Identifier: MIT
+//
+// This file is part of bayespp.
+// See the LICENSE file in the project root for full license information.
+
+#ifndef BAYESPP_NLML_OPT_HPP
+#define BAYESPP_NLML_OPT_HPP
 #pragma once
 
 #include <iostream>
@@ -142,7 +148,7 @@ namespace bayespp::detail {
     double best_nlml = std::numeric_limits<double>::infinity();
     Eigen::VectorXd best_param = initial_guesses[0];
 
-    for (auto& guess : initial_guesses) {
+    for (const auto& guess : initial_guesses) {
         Eigen::VectorXd current_param = guess;
         try {
             double nlml;
